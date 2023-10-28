@@ -45,3 +45,8 @@ stringToMethod' _         = Nothing
 export
 stringToMethod : String -> Maybe Method
 stringToMethod s = stringToMethod' $ toUpper s
+
+
+public export
+Show Method where
+  show = methodToString

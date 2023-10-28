@@ -8,6 +8,11 @@ data ProtocolError : Type where
   ProtocolErrorMessage : String -> ProtocolError
 
 
+public export
+Show ProtocolError where
+  show (ProtocolErrorMessage msg) = msg
+
+
 export
 parseRequestLine : String -> Maybe (String, String, String)
 parseRequestLine line =

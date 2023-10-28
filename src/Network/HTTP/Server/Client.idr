@@ -9,36 +9,32 @@ import Network.HTTP.Request
 import Network.Socket
 
 
-export
+public export
 data HTTPClient : Type where
   Client : (buf : ByteString) -> (sock : Socket) -> HTTPClient
 
 
-export
+public export
 data HTTPClientError : Type where
   ClientSocketError : SocketError -> HTTPClientError
   ClientProtocolError : ProtocolError -> HTTPClientError
 
 
-export
+public export
+Show HTTPClientError where
+  show (ClientSocketError err) = "ClientSocketError: " ++ show err
+  show (ClientProtocolError err) = "ClientProtocolError: " ++ show err
+
+
 crlfBreak : ByteString -> Maybe (ByteString, ByteString)
-crlfBreak bs = match (NM empty) bs where
-  data MS : Type where
-    M : (p : ByteString) -> MS
-    NM : (p : ByteString) -> MS
-    CR : (p : ByteString) -> MS
-  match : MS -> ByteString -> Maybe (ByteString, ByteString)
-  match ms s =
-    case (ms, uncons s) of
-      (M p, _) => Just (p, s)                           -- Matched CRLF
-      (NM p, Just (13, s')) => match (CR p) s'          -- Matched CR
-      (CR p, Just (10, s')) => match (M p) s'           -- Matched LF
-      (NM p, Just (b, s')) => match (NM $ snoc b p) s'  -- No match
-      (CR p, Just (b, s')) => match (NM $ snoc b p) s'  -- No match
-      (_, Nothing) => Nothing
+crlfBreak bs = match 0 False $ uncons bs where
+  match : Nat -> Bool -> Maybe (Bits8, ByteString) -> Maybe (ByteString, ByteString)
+  match _ _ Nothing = Nothing
+  match n False (Just (13, bs')) = match (n + 1) True $ uncons bs'
+  match (S n) True (Just (10, bs')) = Just (take n bs, bs')
+  match n _ (Just (_, bs')) = match (n + 1) False $ uncons bs'
 
 
-export
 recvBytes : HTTPClient -> Nat -> IO (Either SocketError (ByteString, HTTPClient))
 recvBytes (Client buf sock) n = do
   Nothing <- pure $ splitAt n buf
@@ -48,7 +44,6 @@ recvBytes (Client buf sock) n = do
   recvBytes (Client (buf `append` bs) sock) n
 
 
-export
 recvLine : HTTPClient -> IO (Either SocketError (ByteString, HTTPClient))
 recvLine (Client buf sock) = do
   Nothing <- pure $ crlfBreak buf
@@ -58,7 +53,6 @@ recvLine (Client buf sock) = do
   recvLine $ Client (buf `append` bs) sock
 
 
-export
 recvHeaders : HTTPClient
            -> Headers
            -> IO (Either HTTPClientError (Headers, HTTPClient))
@@ -74,12 +68,12 @@ recvHeaders client0 headers = do
 export
 recvRequest : HTTPClient -> IO (Either HTTPClientError Request)
 recvRequest (Client buf sock) = do
-  Right (line, client0) <- recvLine $ Client buf sock
+  Right (line, client) <- recvLine $ Client buf sock
   | Left err => pure $ Left $ ClientSocketError err
-  Just (method, resource, "HTTP/1.1") <- pure $ parseRequestLine $ toString line
+  Just (method, resource, version) <- pure $ parseRequestLine $ toString line
   | _ => pure $ Left $ ClientProtocolError $ ProtocolErrorMessage "Invalid request"
-  Right (headers, client1) <- recvHeaders client0 empty
+  Right (headers, Client buf' sock') <- recvHeaders client empty
   | Left err => pure $ Left err
   Just method' <- pure $ stringToMethod method
   | Nothing => pure $ Left $ ClientProtocolError $ ProtocolErrorMessage "Invalid method"
-  pure $ Right $ MkRequest method' resource headers ?recvBody
+  pure $ Right $ MkRequest method' resource version headers $ BodyReader sock' buf'

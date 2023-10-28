@@ -4,35 +4,35 @@ import Data.String
 import Network.HTTP.Protocol
 
 
-export
+public export
 record Header where
   constructor MkHeader
   name : String
   values : List String
 
 
-export
+public export
+Show Header where
+  show (MkHeader name values) =
+    "MkHeader " ++ show name ++ " [" ++ (joinBy ", " (map show values)) ++ "]"
+
+
+public export
 Headers : Type
 Headers = List Header
 
 
 export
 parseHeader : String -> Either ProtocolError (Maybe Header)
-parseHeader line =
-  if null line
-  then Right Nothing
-  else
-    let
-      (name, rest) = break (== ':') line
-      maybeValue =
-        case strM rest of
-          StrCons ' ' rest' => Just rest'
-          _ => Nothing
-    in return name maybeValue
-  where
-    return : String -> Maybe String -> Either ProtocolError (Maybe Header)
-    return name (Just value) = Right $ Just $ MkHeader name [value]
-    return _ Nothing = Left $ ProtocolErrorMessage "Invalid header"
+parseHeader l = match 0 $ strM l where
+  mkHeader : Int -> StrM s -> Either ProtocolError (Maybe Header)
+  mkHeader i (StrCons ' ' s) = Right $ Just $ MkHeader (strSubstr 0 i l) [s]
+  mkHeader _ _ = Left $ ProtocolErrorMessage "Invalid header"
+  match : Int -> StrM s -> Either ProtocolError (Maybe Header)
+  match 0 StrNil = Right Nothing
+  match i (StrCons ':' s) = mkHeader i $ strM s
+  match i (StrCons c s) = match (i + 1) $ strM s
+  match _ StrNil = Left $ ProtocolErrorMessage "Invalid header"
 
 
 export
@@ -42,6 +42,15 @@ addHeader header (MkHeader name values :: headers) =
   if name == header.name
   then MkHeader name (header.values ++ values) :: headers
   else MkHeader name values :: addHeader header headers
+
+
+export
+hasHeader : String -> Headers -> Bool
+hasHeader name [] = False
+hasHeader name (MkHeader name' _ :: headers) =
+  if name == name'
+  then True
+  else hasHeader name headers
 
 
 export
