@@ -11,7 +11,7 @@ import Network.Socket.Data
 
 
 handler : Application
-handler _ respond = respond $ MkResponse 200 empty "Hello, world!"
+handler _ respond = respond $ MkResponse statusOK empty "Hello, world!"
 
 
 main : IO ()

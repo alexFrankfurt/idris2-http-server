@@ -55,10 +55,12 @@ serverClientAcceptor serverSock app = do
   -- Accept the connection
   Right (clientSock, clientAddr) <- accept serverSock
   | Left err => putStrLn $ "Accept failed: " ++ show err
-  -- Handle the connection
-  serverClientHandler clientSock clientAddr app
-  -- Close the connection
-  close clientSock
+  -- Fork the connection handler
+  _ <- fork $ do
+    serverClientHandler clientSock clientAddr app
+    -- Close the connection
+    close clientSock
+  pure ()
 
 
 serverLoop : Socket -> Application -> IO HTTPServerError

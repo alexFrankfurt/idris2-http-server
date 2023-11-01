@@ -37,8 +37,18 @@ Show Request where
       headers = show req.headers
       body = show req.body
     in
-      "Request { method = " ++ method
-               ++ ", resource = " ++ resource
-               ++ ", version = " ++ version
-               ++ ", headers = " ++ headers
-               ++ ", body = " ++ body ++ " }"
+      "MkRequest { method = " ++ method
+                 ++ ", resource = " ++ resource
+                 ++ ", version = " ++ version
+                 ++ ", headers = " ++ headers
+                 ++ ", body = " ++ body ++ " }"
+
+
+public export
+readRequestBody : Body -> IO (Either SocketError ByteString)
+readRequestBody (BodyReader sock buf) = do
+  Right buf' <- recvByteString 4096 sock
+  | Left err => pure $ Left err
+  if ByteString.length buf' == 0
+    then pure $ Right $ buf `append` buf'
+    else readRequestBody (BodyReader sock (buf `append` buf'))
