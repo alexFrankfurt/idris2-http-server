@@ -1,6 +1,9 @@
 module Network.HTTP.Methods
 
 import Data.String
+import Derive.Prelude
+
+%language ElabReflection
 
 
 public export
@@ -16,18 +19,7 @@ data Method
   | PATCH
 
 
-public export
-Eq Method where
-  GET     == GET     = True
-  POST    == POST    = True
-  PUT     == PUT     = True
-  DELETE  == DELETE  = True
-  HEAD    == HEAD    = True
-  OPTIONS == OPTIONS = True
-  TRACE   == TRACE   = True
-  CONNECT == CONNECT = True
-  PATCH   == PATCH   = True
-  _       == _       = False
+%runElab derive "Method" [Show, Eq]
 
 
 export

@@ -76,4 +76,4 @@ recvRequest (Client buf sock) = do
   | Left err => pure $ Left err
   Just method' <- pure $ stringToMethod method
   | Nothing => pure $ Left $ ClientProtocolError $ ProtocolErrorMessage "Invalid method"
-  pure $ Right $ MkRequest method' resource version headers $ BodyReader sock' buf'
+  pure $ Right $ MkRequest method' resource version headers $ BodyReader buf' sock'

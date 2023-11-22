@@ -8,13 +8,15 @@ import Network.Socket
 
 
 public export
-data Body : Type where
-  BodyReader : Socket -> ByteString -> Body
+record Body where
+  constructor BodyReader
+  buffer : ByteString
+  socket : Socket
 
 
 public export
 Show Body where
-  show (BodyReader _ _) = "<BodyReader>"
+  show _ = "<BodyReader>"
 
 
 public export
@@ -45,10 +47,11 @@ Show Request where
 
 
 public export
-readRequestBody : Body -> IO (Either SocketError ByteString)
-readRequestBody (BodyReader sock buf) = do
-  Right buf' <- recvByteString 4096 sock
+readRequestBody : Request -> IO (Either SocketError ByteString)
+readRequestBody request = do
+  Right buffer <- recvByteString 4096 request.body.socket
   | Left err => pure $ Left err
-  if ByteString.length buf' == 0
-    then pure $ Right $ buf `append` buf'
-    else readRequestBody (BodyReader sock (buf `append` buf'))
+  let buffer' = request.body.buffer `append` buffer
+  if ByteString.length buffer' == 0
+    then pure $ Right buffer'
+    else readRequestBody $ { body := { buffer := buffer' } request.body } request

@@ -20,6 +20,7 @@ data Path : Type where
   CaptureSegment : {a : Type} -> String -> (String -> Maybe a) -> Path -> Path
   MatchSegment : String -> Path -> Path
   RootPath : Path
+  SubPaths : Path
 
 
 public export
@@ -30,6 +31,7 @@ public export
 public export
 handlerType : Path -> Type
 handlerType RootPath = Application
+handlerType SubPaths = Application
 handlerType (CaptureRemaining _) = List String -> Application
 handlerType (CaptureSegment {a} _ _ rest) = a -> handlerType rest
 handlerType (MatchSegment _ rest) = handlerType rest
@@ -59,6 +61,7 @@ public export
 matchPath : (path : Path) -> List String -> handlerType path -> Maybe Application
 matchPath RootPath [] handler = Just handler
 matchPath RootPath _ _ = Nothing
+matchPath SubPaths _ handler = Just handler
 matchPath (CaptureRemaining _) path handler = Just $ handler path
 matchPath (CaptureSegment _ parse rest) (a :: path) handler =
   case parse a of

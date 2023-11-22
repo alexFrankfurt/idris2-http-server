@@ -15,6 +15,8 @@ authors = "Mike Taylor"
 -- packages to add to search path
 depends = base
         , bytestring
+        , elab-util
+        , json
         , network
 
 -- modules to install
