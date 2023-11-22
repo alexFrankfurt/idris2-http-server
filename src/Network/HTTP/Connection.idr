@@ -2,21 +2,27 @@ module Network.HTTP.Connection
 
 import Data.Buffer.Indexed
 import Data.ByteString
+import Data.IORef
 import Network.HTTP.Headers
 import Network.HTTP.Methods
 import Network.HTTP.Protocol
 import Network.Socket
 
 
-public export
-record HTTPConnection where
-  constructor Connection
+export
+record ConnectionBuffer where
+  constructor MkConnectionBuffer
   buffer : ByteString
   socket : Socket
 
+
+public export
+HTTPConnection : Type
+HTTPConnection = IORef ConnectionBuffer
+
 export
 Show HTTPConnection where
-  show (Connection _ _) = "<HTTPConnection>"
+  show _ = "<HTTPConnection>"
 
 
 public export
@@ -40,34 +46,53 @@ crlfBreak bs = match 0 False $ uncons bs where
   match n _ (Just (_, bs')) = match (n + 1) False $ uncons bs'
 
 
+setBuffer : HTTPConnection -> ByteString -> IO ()
+setBuffer connection content = do
+  conn <- readIORef connection
+  writeIORef connection $ MkConnectionBuffer content conn.socket
+
+
 export
-recvBytes : HTTPConnection -> Nat -> IO (Either SocketError (ByteString, HTTPConnection))
-recvBytes (Connection buf sock) n = do
+newConnection : Socket -> IO HTTPConnection
+newConnection socket = newIORef $ MkConnectionBuffer empty socket
+
+
+export
+recvBytes : HTTPConnection -> Nat -> IO (Either SocketError ByteString)
+recvBytes connection n = do
+  MkConnectionBuffer buf sock <- readIORef connection
+  -- Try to read from the buffer first
   Nothing <- pure $ splitAt n buf
-  | Just (bs, buf') => pure $ Right (bs, Connection buf' sock)
+  | Just (bs, buf') => setBuffer connection empty >> (pure $ Right bs)
+  -- Otherwise, read from the socket
   Right bs <- recvByteString n sock
   | Left err => pure $ Left err
-  recvBytes (Connection (buf `append` bs) sock) n
+  -- Update the buffer and recurse
+  writeIORef connection $ MkConnectionBuffer (buf `append` bs) sock
+  recvBytes connection n
 
 
 export
-recvLine : HTTPConnection -> IO (Either SocketError (ByteString, HTTPConnection))
-recvLine (Connection buf sock) = do
+recvLine : HTTPConnection -> IO (Either SocketError ByteString)
+recvLine connection = do
+  MkConnectionBuffer buf sock <- readIORef connection
+  -- Try to read from the buffer first
   Nothing <- pure $ crlfBreak buf
-  | Just (line, buf') => pure $ Right (line, Connection buf' sock)
+  | Just (line, buf') => setBuffer connection buf' >> (pure $ Right line)
+  -- Otherwise, read from the socket
   Right bs <- recvByteString 4096 sock
   | Left err => pure $ Left err
-  recvLine $ Connection (buf `append` bs) sock
+  -- Update the buffer and recurse
+  writeIORef connection $ MkConnectionBuffer (buf `append` bs) sock
+  recvLine connection
 
 
 export
-recvHeaders : HTTPConnection
-           -> Headers
-           -> IO (Either HTTPConnectionError (Headers, HTTPConnection))
-recvHeaders client0 headers = do
-  Right (line, client1) <- recvLine client0
+recvHeaders : HTTPConnection -> Headers -> IO (Either HTTPConnectionError Headers)
+recvHeaders connection headers = do
+  Right line <- recvLine connection
   | Left err => pure $ Left $ ConnectionSocketError err
   Right (Just header) <- pure $ parseHeader $ toString line
-  | Right Nothing => pure $ Right (headers, client1)
+  | Right Nothing => pure $ Right headers
   | Left err => pure $ Left $ ConnectionProtocolError err
-  recvHeaders client1 (addHeader header headers)
+  recvHeaders connection (addHeader header headers)

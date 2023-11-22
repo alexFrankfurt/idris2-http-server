@@ -2,6 +2,7 @@ module Network.HTTP.Request
 
 import Data.Buffer.Indexed
 import Data.ByteString
+import Data.IORef
 import Data.String
 import Network.HTTP.Connection
 import Network.HTTP.Headers
@@ -54,7 +55,7 @@ readRequestBody : Request -> IO (Either HTTPConnectionError ByteString)
 readRequestBody request =
   case (request.connection, contentLength request) of
     (Just connection, Just contentLength) => do
-      Right (body, _) <- Network.HTTP.Connection.recvBytes connection contentLength
+      Right body <- Network.HTTP.Connection.recvBytes connection contentLength
       | Left err => pure $ Left $ ConnectionSocketError err
       pure $ Right body
     (Just connection, Nothing) =>
@@ -67,9 +68,9 @@ readRequestBody request =
 
 export
 recvRequest : HTTPConnection -> IO (Either HTTPConnectionError Request)
-recvRequest (Connection buf sock) = do
+recvRequest connection = do
   -- Receive the request line
-  Right (line, client) <- recvLine $ Connection buf sock
+  Right line <- recvLine connection
   | Left err =>
     pure $ Left $ ConnectionSocketError err
 
@@ -79,7 +80,7 @@ recvRequest (Connection buf sock) = do
     pure $ Left $ ConnectionProtocolError $ ProtocolErrorMessage "Invalid request"
 
   -- Receive the headers
-  Right (headers, connection') <- recvHeaders client empty
+  Right headers <- recvHeaders connection empty
   | Left err =>
     pure $ Left err
 
@@ -89,4 +90,4 @@ recvRequest (Connection buf sock) = do
     pure $ Left $ ConnectionProtocolError $ ProtocolErrorMessage "Invalid method"
 
   -- Assemble the request
-  pure $ Right $ MkRequest (Just connection') method' resource version headers
+  pure $ Right $ MkRequest (Just connection) method' resource version headers

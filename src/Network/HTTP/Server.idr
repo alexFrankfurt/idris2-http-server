@@ -1,6 +1,7 @@
 module Network.HTTP.Server
 
 import Data.ByteString
+import Data.IORef
 import Network.HTTP.Application
 import Network.HTTP.Connection
 import Network.HTTP.Headers
@@ -39,7 +40,8 @@ listenOn port = do
 serverConnectionHandler : Socket -> SocketAddress -> Application -> IO ()
 serverConnectionHandler sock _ app = do
   -- Receive the request
-  Right request <- recvRequest $ Connection empty sock
+  connection <- newConnection sock
+  Right request <- recvRequest connection
   | Left err => putStrLn $ "Receive request failed: " ++ show err
   -- Print the request
   putStrLn $ show request
