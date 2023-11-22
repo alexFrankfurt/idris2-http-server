@@ -2,10 +2,10 @@ module Network.HTTP.Server
 
 import Data.ByteString
 import Network.HTTP.Application
+import Network.HTTP.Connection
 import Network.HTTP.Headers
 import Network.HTTP.Request
 import Network.HTTP.Response
-import Network.HTTP.Server.Client
 import Network.Socket
 
 
@@ -36,10 +36,10 @@ listenOn port = do
          else pure $ Right sock
 
 
-serverClientHandler : Socket -> SocketAddress -> Application -> IO ()
-serverClientHandler sock _ app = do
+serverConnectionHandler : Socket -> SocketAddress -> Application -> IO ()
+serverConnectionHandler sock _ app = do
   -- Receive the request
-  Right request <- recvRequest $ Client empty sock
+  Right request <- recvRequest $ Connection empty sock
   | Left err => putStrLn $ "Receive request failed: " ++ show err
   -- Print the request
   putStrLn $ show request
@@ -50,14 +50,14 @@ serverClientHandler sock _ app = do
   putStrLn $ show response
 
 
-serverClientAcceptor : Socket -> Application -> IO ()
-serverClientAcceptor serverSock app = do
+serverConnectionAcceptor : Socket -> Application -> IO ()
+serverConnectionAcceptor serverSock app = do
   -- Accept the connection
   Right (clientSock, clientAddr) <- accept serverSock
   | Left err => putStrLn $ "Accept failed: " ++ show err
   -- Fork the connection handler
   _ <- fork $ do
-    serverClientHandler clientSock clientAddr app
+    serverConnectionHandler clientSock clientAddr app
     -- Close the connection
     close clientSock
   pure ()
@@ -66,7 +66,7 @@ serverClientAcceptor serverSock app = do
 serverLoop : Socket -> Application -> IO HTTPServerError
 serverLoop serverSock app = do
   -- Handle the next connection
-  serverClientAcceptor serverSock app
+  serverConnectionAcceptor serverSock app
   -- Loop to the next connection
   serverLoop serverSock app
 

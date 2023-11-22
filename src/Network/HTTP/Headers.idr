@@ -45,6 +45,15 @@ addHeader header (MkHeader name values :: headers) =
 
 
 export
+getHeader : String -> Headers -> Maybe String
+getHeader name (MkHeader name' (value :: _) :: headers) =
+  if toLower name == toLower name'
+  then Just value
+  else getHeader name headers
+getHeader _ _ = Nothing
+
+
+export
 hasHeader : String -> Headers -> Bool
 hasHeader name [] = False
 hasHeader name (MkHeader name' _ :: headers) =

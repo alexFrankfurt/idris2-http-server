@@ -2,56 +2,91 @@ module Network.HTTP.Request
 
 import Data.Buffer.Indexed
 import Data.ByteString
+import Data.String
+import Network.HTTP.Connection
 import Network.HTTP.Headers
 import Network.HTTP.Methods
+import Network.HTTP.Protocol
 import Network.Socket
-
-
-public export
-record Body where
-  constructor BodyReader
-  buffer : ByteString
-  socket : Socket
-
-
-public export
-Show Body where
-  show _ = "<BodyReader>"
 
 
 public export
 record Request where
   constructor MkRequest
+  connection : Maybe HTTPConnection
   method : Method
   resource : String
   version : String
   headers : Headers
-  body : Body
-
 
 public export
 Show Request where
   show req =
     let
+      connection = show req.connection
       method = show req.method
       resource = show req.resource
       version = show req.version
       headers = show req.headers
-      body = show req.body
     in
-      "MkRequest { method = " ++ method
+      "MkRequest { connection = " ++ connection
+                 ++ ", method = " ++ method
                  ++ ", resource = " ++ resource
                  ++ ", version = " ++ version
-                 ++ ", headers = " ++ headers
-                 ++ ", body = " ++ body ++ " }"
+                 ++ ", headers = " ++ headers ++ " }"
+
+
+contentLength : Request -> Maybe Nat
+contentLength request =
+  let
+    contentLengthString = getHeader "Content-Length" request.headers
+  in
+    case contentLengthString of
+      Just contentLengthString =>
+        parsePositive contentLengthString
+
+      Nothing =>
+        Nothing
 
 
 public export
-readRequestBody : Request -> IO (Either SocketError ByteString)
-readRequestBody request = do
-  Right buffer <- recvByteString 4096 request.body.socket
-  | Left err => pure $ Left err
-  let buffer' = request.body.buffer `append` buffer
-  if ByteString.length buffer' == 0
-    then pure $ Right buffer'
-    else readRequestBody $ { body := { buffer := buffer' } request.body } request
+readRequestBody : Request -> IO (Either HTTPConnectionError ByteString)
+readRequestBody request =
+  case (request.connection, contentLength request) of
+    (Just connection, Just contentLength) => do
+      Right (body, _) <- Network.HTTP.Connection.recvBytes connection contentLength
+      | Left err => pure $ Left $ ConnectionSocketError err
+      pure $ Right body
+    (Just connection, Nothing) =>
+      pure $ Left $ ConnectionProtocolError $
+        ProtocolErrorMessage "No Content-Length header"
+    (Nothing, _) =>
+      pure $ Left $ ConnectionProtocolError $
+        ProtocolErrorMessage "No connection"
+
+
+export
+recvRequest : HTTPConnection -> IO (Either HTTPConnectionError Request)
+recvRequest (Connection buf sock) = do
+  -- Receive the request line
+  Right (line, client) <- recvLine $ Connection buf sock
+  | Left err =>
+    pure $ Left $ ConnectionSocketError err
+
+  -- Parse the request line
+  Just (method, resource, version) <- pure $ parseRequestLine $ toString line
+  | _ =>
+    pure $ Left $ ConnectionProtocolError $ ProtocolErrorMessage "Invalid request"
+
+  -- Receive the headers
+  Right (headers, connection') <- recvHeaders client empty
+  | Left err =>
+    pure $ Left err
+
+  -- Parse the method
+  Just method' <- pure $ stringToMethod method
+  | Nothing =>
+    pure $ Left $ ConnectionProtocolError $ ProtocolErrorMessage "Invalid method"
+
+  -- Assemble the request
+  pure $ Right $ MkRequest (Just connection') method' resource version headers

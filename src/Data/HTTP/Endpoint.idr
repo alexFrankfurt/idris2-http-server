@@ -4,6 +4,7 @@ import Data.Buffer.Indexed
 import Data.ByteString
 import JSON
 import Network.HTTP.Application
+import Network.HTTP.Connection
 import Network.HTTP.Headers
 import Network.HTTP.Methods
 import Network.HTTP.Request
