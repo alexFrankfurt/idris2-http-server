@@ -76,5 +76,10 @@ get ep = Ep [(GET, Getter ep)] ()
 
 
 public export
+post : (a -> IO a) -> Endpoint a ()
+post ep = Ep [(POST, Putter ep)] ()
+
+
+public export
 put : (a -> IO a) -> Endpoint a ()
 put ep = Ep [(PUT, Putter ep)] ()

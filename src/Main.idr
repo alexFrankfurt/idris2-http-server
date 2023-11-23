@@ -1,20 +1,23 @@
 module Main
 
-import Data.HTTP.Router
-import Data.HTTP.Users
-import Data.Users
+import Auth.Groups
+import Auth.Users
+import Auth.HTTP.Groups
+import Auth.HTTP.Users
 import Data.IORef
+import Data.HTTP.Router
 import Network.HTTP.Application
 import Network.HTTP.Server
 import Network.Socket.Data
 
 
-handler : IORef (List User) -> Application
-handler users = route $ usersRoutes users
+handler : Users -> Groups -> Application
+handler users groups = route $ usersRouter users <||> groupsRouter groups
 
 
 main : IO ()
 main = do
-  users <- newIORef []
-  result <- listenAndServe 8080 $ handler users
+  users <- newUsers
+  groups <- newGroups
+  result <- listenAndServe 8080 $ handler users groups
   putStrLn $ "Error: " ++ show result
