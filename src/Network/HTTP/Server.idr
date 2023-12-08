@@ -41,7 +41,7 @@ serverConnectionHandler : Socket -> SocketAddress -> Application -> IO ()
 serverConnectionHandler sock _ app = do
   -- Receive the request
   connection <- newConnection sock
-  Right request <- recvRequest connection
+  Right request <- readRequestHeaders connection
   | Left err => putStrLn $ "Receive request failed: " ++ show err
   -- Print the request
   putStrLn $ show request
