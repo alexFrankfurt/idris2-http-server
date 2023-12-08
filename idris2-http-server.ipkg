@@ -16,6 +16,7 @@ authors = "Mike Taylor"
 depends = base
         , bytestring
         , elab-util
+        , idris2-http-types
         , json
         , network
 
