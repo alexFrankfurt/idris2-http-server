@@ -42,7 +42,7 @@ serverConnectionHandler sock _ app = do
   -- Receive the request
   connection <- newConnection sock
   Right request <- readRequestHeaders connection
-  | Left err => putStrLn $ "Receive request failed: " ++ show err
+  | Left err => putStrLn $ "Read request headers failed: " ++ show err
   -- Print the request
   putStrLn $ show request
   -- Invoke the app to send the response
