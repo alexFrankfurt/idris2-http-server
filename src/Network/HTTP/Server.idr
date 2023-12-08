@@ -46,7 +46,7 @@ serverConnectionHandler sock _ app = do
   -- Print the request
   putStrLn $ show request
   -- Invoke the app to send the response
-  SentResponse response <- app request $ mkRespond sock request
+  SentResponse response <- app request $ mkRespond sock
   | SendResponseError _ err => putStrLn $ "Send response failed: " ++ show err
   -- Print the response
   putStrLn $ show response
