@@ -15,19 +15,16 @@ authors = "Mike Taylor"
 -- packages to add to search path
 depends = base
         , bytestring
-        , elab-util
         , idris2-http-types
-        , json
-        , network
 
 -- modules to install
--- modules =
+modules = Network.HTTP.Server
 
 -- main file (i.e. file to load at REPL)
-main = Main
+-- main =
 
 -- name of executable
-executable = "idris2-http-server"
+-- executable =
 -- opts =
 sourcedir = "src"
 -- builddir =
