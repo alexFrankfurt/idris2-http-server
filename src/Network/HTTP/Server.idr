@@ -10,20 +10,20 @@ import Network.HTTP.Response
 import Network.Socket
 
 
-data HTTPServerError : Type where
-  ServerBindError : Int -> HTTPServerError
-  ServerListenError : Int -> HTTPServerError
-  ServerSocketError : SocketError -> HTTPServerError
+data ServerError : Type where
+  ServerBindError : Int -> ServerError
+  ServerListenError : Int -> ServerError
+  ServerSocketError : SocketError -> ServerError
 
 
 export
-Show HTTPServerError where
+Show ServerError where
   show (ServerBindError err) = "Bind error: " ++ show err
   show (ServerListenError err) = "Listen error: " ++ show err
   show (ServerSocketError err) = "Socket error: " ++ show err
 
 
-listenOn : Port -> IO (Either HTTPServerError Socket)
+listenOn : Port -> IO (Either ServerError Socket)
 listenOn port = do
   Right sock <- socket AF_INET Stream 0
   | Left err => pure $ Left $ ServerSocketError err
@@ -65,7 +65,7 @@ serverConnectionAcceptor serverSock app = do
   pure ()
 
 
-serverLoop : Socket -> Application -> IO HTTPServerError
+serverLoop : Socket -> Application -> IO ServerError
 serverLoop serverSock app = do
   -- Handle the next connection
   serverConnectionAcceptor serverSock app
@@ -74,7 +74,7 @@ serverLoop serverSock app = do
 
 
 export
-listenAndServe : Port -> Application -> IO HTTPServerError
+listenAndServe : Port -> Application -> IO ServerError
 listenAndServe port app = do
   Right sock <- listenOn port
   | Left err => pure err
