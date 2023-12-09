@@ -37,16 +37,17 @@ listenOn port = do
          else pure $ Right sock
 
 
-serverConnectionHandler : Socket -> SocketAddress -> Application -> IO ()
-serverConnectionHandler sock _ app = do
+serverConnectionHandler : Connection -> SocketAddress -> Application -> IO ()
+serverConnectionHandler connection addr app = do
+  MkConnectionBuffer _ sock <- readIORef connection
   -- Receive the request
-  connection <- newConnection sock
   Right request <- readRequestHeaders connection
   | Left err => putStrLn $ "Read request headers failed: " ++ show err
   -- Invoke the app to send the response
   SentResponse response <- app request $ mkRespond sock
   | SendResponseError _ err => putStrLn $ "Send response failed: " ++ show err
-  pure ()
+  -- Handle the next request
+  serverConnectionHandler connection addr app
 
 
 serverConnectionAcceptor : Socket -> Application -> IO ()
@@ -56,8 +57,8 @@ serverConnectionAcceptor serverSock app = do
   | Left err => putStrLn $ "Accept failed: " ++ show err
   -- Fork the connection handler
   _ <- fork $ do
-    serverConnectionHandler clientSock clientAddr app
-    -- Close the connection
+    connection <- newConnection clientSock
+    serverConnectionHandler connection clientAddr app
     close clientSock
   pure ()
 
