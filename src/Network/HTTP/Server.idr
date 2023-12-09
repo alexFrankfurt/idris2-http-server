@@ -43,13 +43,10 @@ serverConnectionHandler sock _ app = do
   connection <- newConnection sock
   Right request <- readRequestHeaders connection
   | Left err => putStrLn $ "Read request headers failed: " ++ show err
-  -- Print the request
-  putStrLn $ show request
   -- Invoke the app to send the response
   SentResponse response <- app request $ mkRespond sock
   | SendResponseError _ err => putStrLn $ "Send response failed: " ++ show err
-  -- Print the response
-  putStrLn $ show response
+  pure ()
 
 
 serverConnectionAcceptor : Socket -> Application -> IO ()

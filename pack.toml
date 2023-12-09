@@ -12,5 +12,5 @@ ipkg = "test.ipkg"
 [custom.all.idris2-http-types]
 type = "github"
 url = "https://github.com/mtaylor91/idris2-http-types"
-commit = "a2e1a9a5f0f1174d827bc04567b1dafbfc5fb5df"
+commit = "1b8fd5dbf2349e0239a097f46e27becc2052410b"
 ipkg = "idris2-http-types.ipkg"
