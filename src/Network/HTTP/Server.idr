@@ -39,13 +39,20 @@ listenOn port = do
 
 serverConnectionHandler : Connection -> SocketAddress -> Application -> IO ()
 serverConnectionHandler connection addr app = do
+  putStrLn "[server] handling connection"
   MkConnectionBuffer _ sock <- readIORef connection
   -- Receive the request
   Right request <- readRequestHeaders connection
-  | Left err => putStrLn $ "Read request headers failed: " ++ show err
+  | Left err => do
+      putStrLn $ "[server] readRequestHeaders failed: " ++ show err
+      pure ()
+  putStrLn $ "[server] received request: " ++ show request
   -- Invoke the app to send the response
   SentResponse response <- app request $ mkRespond sock
-  | SendResponseError _ err => putStrLn $ "Send response failed: " ++ show err
+  | SendResponseError _ err => do
+      putStrLn $ "[server] send response failed: " ++ show err
+      pure ()
+  putStrLn $ "[server] sent response: " ++ show response.status
   -- Handle the next request
   serverConnectionHandler connection addr app
 
@@ -54,12 +61,16 @@ serverConnectionAcceptor : Socket -> Application -> IO ()
 serverConnectionAcceptor serverSock app = do
   -- Accept the connection
   Right (clientSock, clientAddr) <- accept serverSock
-  | Left err => putStrLn $ "Accept failed: " ++ show err
-  -- Fork the connection handler
-  _ <- fork $ do
-    connection <- newConnection clientSock
-    serverConnectionHandler connection clientAddr app
-    close clientSock
+  | Left err => do
+      putStrLn $ "[server] accept failed: " ++ show err
+      pure ()
+  putStrLn $ "[server] accepted connection from: " ++ show clientAddr
+  -- Handle the connection synchronously for now
+  connection <- newConnection clientSock
+  putStrLn "[server] created new connection"
+  serverConnectionHandler connection clientAddr app
+  close clientSock
+  putStrLn "[server] closed client socket"
   pure ()
 
 
