@@ -8,6 +8,7 @@ import Network.HTTP.Headers
 import Network.HTTP.Request
 import Network.HTTP.Response
 import Network.Socket
+import System.Info
 
 
 data ServerError : Type where
@@ -41,20 +42,33 @@ serverConnectionHandler : Connection -> SocketAddress -> Application -> IO ()
 serverConnectionHandler connection addr app = do
   putStrLn "[server] handling connection"
   MkConnectionBuffer _ sock <- readIORef connection
-  -- Receive the request
-  Right request <- readRequestHeaders connection
-  | Left err => do
+  readResult <- readRequestHeaders connection
+  case readResult of
+    Left err => do
       putStrLn $ "[server] readRequestHeaders failed: " ++ show err
+      -- putStrLn "[server] terminating connection after read failure"
+      -- close sock
       pure ()
-  putStrLn $ "[server] received request: " ++ show request
-  -- Invoke the app to send the response
-  SentResponse response <- app request $ mkRespond sock
-  | SendResponseError _ err => do
-      putStrLn $ "[server] send response failed: " ++ show err
-      pure ()
-  putStrLn $ "[server] sent response: " ++ show response.status
-  -- Handle the next request
-  serverConnectionHandler connection addr app
+    Right request => do
+      putStrLn $ "[server] received request: " ++ show request
+      appResult <- app request $ mkRespond sock
+      case appResult of
+        SendResponseError _ err => do
+          putStrLn $ "[server] send response failed: " ++ show err
+          putStrLn "[server] terminating connection after send failure"
+          close sock
+        SentResponse response => do
+          putStrLn $ "[server] sent response: " ++ show response.status
+          serverConnectionHandler connection addr app
+
+
+closeClientSocket : Socket -> IO ()
+closeClientSocket sock =
+  if os == "windows"
+     then putStrLn "[server] client socket close skipped on Windows"
+     else do
+       close sock
+       putStrLn "[server] closed client socket"
 
 
 serverConnectionAcceptor : Socket -> Application -> IO ()
@@ -65,13 +79,18 @@ serverConnectionAcceptor serverSock app = do
       putStrLn $ "[server] accept failed: " ++ show err
       pure ()
   putStrLn $ "[server] accepted connection from: " ++ show clientAddr
-  -- Handle the connection synchronously for now
-  connection <- newConnection clientSock
-  putStrLn "[server] created new connection"
-  serverConnectionHandler connection clientAddr app
-  close clientSock
-  putStrLn "[server] closed client socket"
+  putStrLn "[server] about to spawn handler"
+  _ <- fork $ do
+    putStrLn "[server] fork entered"
+    putStrLn "[server] spawned handler"
+    connection <- newConnection clientSock
+    putStrLn "[server] created new connection"
+    serverConnectionHandler connection clientAddr app
+    putStrLn "[server] handler finished"
+    closeClientSocket clientSock
+  putStrLn "[server] fork returned"
   pure ()
+
 
 
 serverLoop : Socket -> Application -> IO ServerError
